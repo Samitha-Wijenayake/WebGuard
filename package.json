@@ -1,0 +1,9 @@
+{
+  "name": "webguard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WebGuard browser security assessment",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

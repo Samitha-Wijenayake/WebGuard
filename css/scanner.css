@@ -1,0 +1,417 @@
+/* =============================================================
+   WebGuard – Scanner Styles  (css/scanner.css)
+   ============================================================= */
+
+/* ── Scanner Container ──────────────────────────────────────── */
+.scanner-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: fadeIn 0.3s ease;
+}
+
+/* ── Scanner Header ─────────────────────────────────────────── */
+.scanner-header {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  position: relative;
+  overflow: hidden;
+}
+
+.scanner-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+  animation: scanPulse 2s infinite;
+}
+
+.scanner-header__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--border-radius);
+  background: rgba(59,130,246,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  flex-shrink: 0;
+  animation: pulse 2s infinite;
+}
+
+.scanner-header__icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.scanner-header__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.scanner-header__target {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  truncate: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.scanner-header__meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.scanner-header__mode {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.scanner-header__elapsed {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.scanner-header__elapsed svg {
+  width: 12px;
+  height: 12px;
+}
+
+.scanner-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ── Progress Steps ─────────────────────────────────────────── */
+.progress-steps {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: 1.25rem 1.5rem;
+  overflow-x: auto;
+}
+
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  position: relative;
+  min-width: 80px;
+}
+
+.progress-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: calc(50% + 20px);
+  right: calc(-50% + 20px);
+  height: 2px;
+  background: var(--border-color);
+}
+
+.progress-step.completed:not(:last-child)::after {
+  background: var(--color-primary);
+}
+
+.progress-step__circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 2px solid var(--border-color);
+  color: var(--text-muted);
+  background: var(--bg-primary);
+  transition: var(--transition);
+  z-index: 1;
+}
+
+.progress-step__circle svg {
+  width: 14px;
+  height: 14px;
+}
+
+.progress-step.active .progress-step__circle {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(59,130,246,0.1);
+  animation: scanPulse 2s infinite;
+}
+
+.progress-step.completed .progress-step__circle {
+  border-color: var(--color-success);
+  color: var(--color-success);
+  background: rgba(34,197,94,0.1);
+}
+
+.progress-step__label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.progress-step.active .progress-step__label   { color: var(--color-primary); }
+.progress-step.completed .progress-step__label { color: var(--text-secondary); }
+
+/* ── Scanner Stats Bar ──────────────────────────────────────── */
+.scanner-stats-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: 1rem 1.25rem;
+}
+
+.scanner-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.scanner-stat__value {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.scanner-stat__label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+/* ── Check List ─────────────────────────────────────────────── */
+.check-list-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+}
+
+.check-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.check-list-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.check-list {
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1.25rem;
+  border-bottom: 1px solid rgba(30,45,69,0.4);
+  transition: var(--transition);
+  font-size: 0.875rem;
+}
+
+.check-item:last-child {
+  border-bottom: none;
+}
+
+.check-item:hover {
+  background: rgba(26,38,64,0.5);
+}
+
+.check-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.check-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Check item states */
+.check-item--pending     .check-icon { background: rgba(100,116,139,0.15); color: var(--text-muted); }
+.check-item--running     .check-icon { background: rgba(59,130,246,0.15);  color: var(--color-primary); animation: pulse 1.5s infinite; }
+.check-item--passed      .check-icon { background: rgba(34,197,94,0.15);   color: var(--color-success); }
+.check-item--failed      .check-icon { background: rgba(239,68,68,0.15);   color: var(--color-critical); }
+.check-item--warning     .check-icon { background: rgba(245,158,11,0.15);  color: var(--color-warning); }
+.check-item--not-testable .check-icon { background: rgba(100,116,139,0.1); color: var(--text-muted); }
+.check-item--error       .check-icon { background: rgba(239,68,68,0.1);    color: var(--color-high); }
+
+.check-item__name {
+  flex: 1;
+  color: var(--text-secondary);
+}
+
+.check-item--running  .check-item__name  { color: var(--text-primary); }
+.check-item--passed   .check-item__name  { color: var(--text-secondary); }
+.check-item--failed   .check-item__name  { color: var(--text-primary); }
+
+.check-item__badge {
+  margin-left: auto;
+}
+
+.check-item__duration {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Scan Log ───────────────────────────────────────────────── */
+.scan-log-container {
+  background: #0a0f1a;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+}
+
+.scan-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.scan-log-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.scan-log-title svg {
+  width: 14px;
+  height: 14px;
+  color: var(--color-primary);
+}
+
+.scan-log {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  padding: 0.75rem 1rem;
+  max-height: 220px;
+  overflow-y: auto;
+  color: #94a3b8;
+}
+
+.scan-log-entry {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.125rem 0;
+}
+
+.scan-log-entry__time {
+  color: #475569;
+  flex-shrink: 0;
+  min-width: 70px;
+}
+
+.scan-log-entry__level {
+  flex-shrink: 0;
+  min-width: 55px;
+  font-weight: 600;
+}
+
+.scan-log-entry--info    .scan-log-entry__level { color: var(--color-primary); }
+.scan-log-entry--success .scan-log-entry__level { color: var(--color-success); }
+.scan-log-entry--warn    .scan-log-entry__level { color: var(--color-warning); }
+.scan-log-entry--error   .scan-log-entry__level { color: var(--color-critical); }
+
+.scan-log-entry__msg {
+  color: #cbd5e1;
+  word-break: break-all;
+}
+
+/* ── Cancel Button ──────────────────────────────────────────── */
+.cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.125rem;
+  border: 1px solid rgba(239,68,68,0.4);
+  border-radius: var(--border-radius);
+  background: rgba(239,68,68,0.08);
+  color: var(--color-critical);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.cancel-btn:hover {
+  background: rgba(239,68,68,0.15);
+  border-color: var(--color-critical);
+}
+
+.cancel-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ── Scanner Overall Progress ───────────────────────────────── */
+.scanner-overall-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scanner-overall-progress__labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.scanner-overall-progress__pct {
+  font-weight: 600;
+  color: var(--color-primary);
+}

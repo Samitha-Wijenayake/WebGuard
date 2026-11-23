@@ -1,0 +1,372 @@
+/* =============================================================
+   WebGuard – Responsive Styles  (css/responsive.css)
+   ============================================================= */
+
+/* ── 1024px: Narrower Sidebar ───────────────────────────────── */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 200px;
+  }
+
+  .brand-name {
+    font-size: 0.9375rem;
+  }
+
+  .nav-item {
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.875rem;
+  }
+
+  .nav-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .overview-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .overview-main-row--3col {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .scan-form-row {
+    flex-wrap: wrap;
+  }
+
+  .main-content {
+    padding: 1.5rem;
+  }
+}
+
+/* ── 768px: Mobile Layout ───────────────────────────────────── */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 240px;
+  }
+
+  /* Show toggle button */
+  .sidebar-toggle {
+    display: flex;
+  }
+
+  /* Sidebar hidden by default on mobile */
+  .sidebar {
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Overlay shown when sidebar is open */
+  .sidebar-overlay.visible {
+    display: block;
+  }
+
+  /* Main takes full width */
+  .main-content {
+    margin-left: 0;
+    padding: 1.25rem;
+    padding-top: 4rem; /* room for hamburger */
+  }
+
+  /* Stacked grids */
+  .overview-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .overview-main-row,
+  .overview-main-row--3col {
+    grid-template-columns: 1fr;
+  }
+
+  .finding-summary-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .page-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Scanner adjustments */
+  .scanner-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .scanner-stats-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .progress-steps {
+    padding: 1rem;
+  }
+
+  .progress-step__label {
+    font-size: 0.6875rem;
+  }
+
+  /* Report cards */
+  .report-card {
+    grid-template-columns: 1fr;
+  }
+
+  .report-actions {
+    flex-wrap: wrap;
+  }
+
+  /* Scan form */
+  .scan-form-row {
+    flex-direction: column;
+  }
+
+  .scan-form-url {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .scan-submit-btn {
+    width: 100%;
+  }
+
+  .scan-form-mode {
+    flex-wrap: wrap;
+  }
+
+  /* Tables */
+  .table-wrapper {
+    overflow-x: auto;
+  }
+
+  /* Cards */
+  .stat-value {
+    font-size: 1.5rem;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    padding: 0.5rem;
+    align-items: flex-end;
+  }
+
+  .modal-content {
+    max-height: 92vh;
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+    max-width: 100%;
+  }
+}
+
+/* ── 480px: Small Mobile ────────────────────────────────────── */
+@media (max-width: 480px) {
+  html {
+    font-size: 15px;
+  }
+
+  .main-content {
+    padding: 1rem;
+    padding-top: 4rem;
+  }
+
+  /* Full-width cards */
+  .overview-stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  .finding-summary-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Typography shrink */
+  .dashboard-header__title,
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .stat-value {
+    font-size: 1.375rem;
+  }
+
+  .grade-letter {
+    font-size: 2.75rem;
+  }
+
+  /* Buttons */
+  .btn-lg {
+    padding: 0.625rem 1.125rem;
+    font-size: 0.9rem;
+  }
+
+  /* Scanner stats: single column */
+  .scanner-stats-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Tabs scroll */
+  .tabs-nav {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tabs-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+  }
+
+  /* Score ring smaller */
+  .score-ring {
+    width: 96px;
+    height: 96px;
+  }
+
+  .score-ring-value {
+    font-size: 1.375rem;
+  }
+
+  /* Check list */
+  .check-item {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+  }
+
+  /* Report card */
+  .report-card__title {
+    max-width: 240px;
+  }
+
+  /* Report actions stack */
+  .report-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .report-actions .btn {
+    justify-content: center;
+  }
+
+  /* Alert */
+  .alert {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /* Modal full-screen on tiny screens */
+  .modal-content {
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  /* Scan log compact */
+  .scan-log {
+    font-size: 0.75rem;
+    max-height: 160px;
+  }
+
+  /* Progress steps: stack labels */
+  .progress-step:not(:last-child)::after {
+    display: none;
+  }
+
+  .progress-steps {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+  }
+
+  .progress-step {
+    flex: unset;
+    min-width: 70px;
+  }
+
+  /* Nav items text truncate hard */
+  .nav-item span {
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Bottom navigation alternative hint strip */
+  .bottom-nav-hint {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border-color);
+    z-index: 80;
+    padding: 0.5rem;
+    justify-content: space-around;
+  }
+
+  .bottom-nav-hint .nav-shortcut {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.625rem;
+    color: var(--text-muted);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+  }
+
+  .bottom-nav-hint .nav-shortcut svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .bottom-nav-hint .nav-shortcut.active {
+    color: var(--color-primary);
+  }
+}
+
+/* ── Print ──────────────────────────────────────────────────── */
+@media print {
+  .sidebar,
+  .sidebar-toggle,
+  .sidebar-overlay,
+  .report-actions,
+  .btn {
+    display: none !important;
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 0;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .card {
+    border: 1px solid #ccc;
+    background: #fff;
+    break-inside: avoid;
+  }
+}
+
+/* ── Reduced Motion ─────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
