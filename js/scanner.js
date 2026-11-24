@@ -1,6 +1,7 @@
 import { getState, setState } from './state.js';
 import { saveScan } from './storage.js';
 import { proxyFetch } from './net.js';
+import { crawlSite, canonicalKey } from './crawler.js';
 
 let cancelled = false;
 let activeController = null;
@@ -53,52 +54,6 @@ async function fetchTarget(url, timeout, signal, maxBytes = 500000) {
   };
 }
 
-function sameOriginLinks(html, baseUrl) {
-  if (!html || typeof DOMParser === 'undefined') return [];
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const origin = new URL(baseUrl).origin;
-  const links = [];
-  doc.querySelectorAll('a[href]').forEach((anchor) => {
-    try {
-      const next = new URL(anchor.getAttribute('href'), baseUrl);
-      if (next.origin !== origin || next.protocol === 'javascript:') return;
-      next.hash = '';
-      if (/\.(png|jpe?g|gif|svg|webp|pdf|zip|mp4|mp3|css|js|ico)$/i.test(next.pathname)) return;
-      links.push(next.href);
-    } catch { /* ignore invalid links */ }
-  });
-  return [...new Set(links)];
-}
-
-async function crawlPages(startUrl, html, limit, timeout, signal, onProgress) {
-  const origin = new URL(startUrl).origin;
-  const seen = new Set([startUrl]);
-  const queue = sameOriginLinks(html, startUrl).filter(link => new URL(link).origin === origin);
-  const pages = [{ url: startUrl, status: 200 }];
-  const cap = Math.max(1, Math.min(Number(limit) || 1, 500));
-  while (queue.length && pages.length < cap) {
-    if (cancelled || signal?.aborted) throw new Error('Scan cancelled');
-    const next = queue.shift();
-    if (!next || seen.has(next)) continue;
-    seen.add(next);
-    try {
-      const data = await proxyFetch(next, { method: 'GET', timeout, signal, maxBytes: 120000 });
-      const finalUrl = data.finalUrl || next;
-      if (new URL(finalUrl).origin === origin) {
-        pages.push({ url: finalUrl, status: data.status });
-        sameOriginLinks(data.body || '', finalUrl).forEach((link) => {
-          if (!seen.has(link)) queue.push(link);
-        });
-      }
-    } catch (error) {
-      if (String(error.message).includes('cancel')) throw error;
-      pages.push({ url: next, status: 0 });
-    }
-    onProgress(pages.length, seen.size + queue.length);
-  }
-  return pages;
-}
-
 function scoreResults(results) {
   const weights = { critical: 24, high: 14, medium: 7, low: 3 };
   const allFindings = [];
@@ -140,6 +95,70 @@ function scoreResults(results) {
   return { score, summary, findings: allFindings };
 }
 
+const CHECK_LABELS = {
+  https: 'HTTPS / Protocol Security',
+  tls: 'TLS Certificate',
+  headers: 'Security Headers',
+  csp: 'Content Security Policy (CSP)',
+  'exposed-files': 'Exposed Sensitive Files',
+};
+
+// Checks that describe the whole origin run once; everything else runs on every scanned page.
+const SITE_LEVEL_CHECKS = new Set(['tls', 'exposed-files']);
+const STATUS_RANK = { failed: 4, error: 4, warning: 3, info: 1, passed: 0, 'not-testable': 0 };
+const SEVERITY_RANK = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
+
+function checkError(id, error) {
+  return { id, name: CHECK_LABELS[id] || id, category: 'Assessment', status: 'error', testable: true, score: 0, findings: [{ title: `${CHECK_LABELS[id] || id} check failed`, severity: 'info', status: 'error', evidence: error.message, impact: 'The check could not complete.', remediation: 'Retry the scan.', confidence: 'confirmed' }] };
+}
+
+/**
+ * Merges the results of one check across every page it ran on.
+ * Identical findings are reported once with the list of affected pages.
+ */
+function mergeCheckResults(entries, totalPages) {
+  const base = entries[0].result;
+  if (entries.length === 1 && totalPages <= 1) {
+    return { ...base, findings: (base.findings || []).map(finding => ({ ...finding, url: finding.url || entries[0].pageUrl })), pagesChecked: 1 };
+  }
+  const groups = new Map();
+  entries.forEach(({ pageUrl, result }) => {
+    (result.findings || []).forEach(finding => {
+      const key = `${finding.title}|${finding.severity}|${finding.status}`;
+      if (!groups.has(key)) groups.set(key, { finding, urls: [] });
+      const group = groups.get(key);
+      if (!group.urls.includes(pageUrl)) group.urls.push(pageUrl);
+    });
+  });
+  const findings = [...groups.values()].map(({ finding, urls }) => ({
+    ...finding,
+    url: finding.url || urls[0],
+    affectedUrls: urls.slice(0, 100),
+    pageCount: urls.length,
+    evidence: `Observed on ${urls.length} of ${totalPages} scanned page${totalPages === 1 ? '' : 's'}.\n${finding.evidence || ''}`.trim(),
+  }));
+  const worst = entries.map(entry => entry.result).reduce((a, b) => ((STATUS_RANK[b.status] || 0) > (STATUS_RANK[a.status] || 0) ? b : a), base);
+  const severity = entries.map(entry => entry.result.severity || 'info').reduce((a, b) => ((SEVERITY_RANK[b] || 0) > (SEVERITY_RANK[a] || 0) ? b : a), 'info');
+  return {
+    ...base,
+    status: worst.status,
+    severity,
+    score: Math.min(...entries.map(entry => Number(entry.result.score ?? 0))),
+    testable: entries.some(entry => entry.result.testable !== false),
+    summary: worst.summary || base.summary,
+    findings,
+    pagesChecked: entries.length,
+  };
+}
+
+function uiStatus(result) {
+  if (result.status === 'failed' || result.status === 'error') return 'failed';
+  if (result.status === 'warning') return 'warning';
+  return 'passed';
+}
+
+const unique = list => [...new Set(list.filter(Boolean))];
+
 export async function startScan(rawUrl, options = {}, onProgress = () => {}) {
   const generation = ++scanGeneration;
   cancelled = false;
@@ -149,47 +168,115 @@ export async function startScan(rawUrl, options = {}, onProgress = () => {}) {
   const stillActive = () => generation === scanGeneration && !cancelled;
   const url = safeTarget(rawUrl);
   const timeout = resolveTimeout(options);
+  const crawlLimit = Math.max(1, Math.min(Number(options.crawlLimit) || Number(getState().settings?.crawlLimit) || 100, 500));
+  const concurrency = Math.max(1, Math.min(Number(options.concurrency) || Number(getState().settings?.concurrency) || 4, 8));
   const scan = { id: `scan-${Date.now()}`, url, mode: options.mode || 'passive', startTime: new Date().toISOString(), createdAt: new Date().toISOString(), status: 'running' };
   setState({ activeScan: scan });
-  const report = (percent, message, extra = {}) => onProgress({ percent, message, ...extra });
-  report(5, 'Validating target and requesting the landing page.', { step: 'init' });
+
+  let lastPercent = 0;
+  const report = (percent, message, extra = {}) => {
+    lastPercent = Math.max(lastPercent, Math.min(99, Math.round(percent)));
+    onProgress({ percent: extra.complete ? 100 : lastPercent, message, ...extra });
+  };
+
+  report(3, 'Validating target and requesting the landing page.', { step: 'init' });
   let fetchedData;
-  try { fetchedData = await fetchTarget(url, timeout, signal); } catch (error) {
+  try { fetchedData = await fetchTarget(url, timeout, signal, 800000); } catch (error) {
     if (String(error.message).toLowerCase().includes('cancel')) throw new Error('Scan cancelled');
     throw new Error(error.message || 'Target could not be fetched.');
   }
   if (!stillActive()) throw new Error('Scan cancelled');
-  if (new URL(fetchedData.finalUrl).origin !== new URL(url).origin) throw new Error('The target redirected to another origin. Scanning stopped to preserve scope.');
-  report(18, 'Landing page loaded. Following same-origin links.', { step: 'crawl', stats: { pagesFound: 1, pagesChecked: 1 } });
-  const pages = await crawlPages(fetchedData.finalUrl, fetchedData.text, options.crawlLimit, timeout, signal, (checked, found) => {
-    report(18 + Math.min(12, checked), `Checked ${checked} page(s).`, { step: 'crawl', stats: { pagesFound: found, pagesChecked: checked } });
-  });
-  report(32, 'Running security checks.', { step: 'checks', stats: { pagesFound: pages.length, pagesChecked: pages.length } });
+  if (canonicalKey(fetchedData.finalUrl)?.split('/')[0] !== canonicalKey(url)?.split('/')[0]) throw new Error('The target redirected to another site. Scanning stopped to preserve scope.');
 
-  const results = [];
-  if (!stillActive()) throw new Error('Scan cancelled');
-  const loadedChecks = [];
-  for (const [index, [id, loader]] of checkLoaders.entries()) {
-    if (!stillActive()) throw new Error('Scan cancelled');
-    const labels = { https: 'HTTPS / Protocol Security', tls: 'TLS Certificate', headers: 'Security Headers', csp: 'Content Security Policy (CSP)', 'exposed-files': 'Exposed Sensitive Files' };
-    const checkPercent = 40 + Math.round((index / checkLoaders.length) * 35);
-    report(checkPercent, `Running ${labels[id] || id}.`, { step: 'checks', check: { name: labels[id] || id, status: 'running' } });
-    const module = await loader();
-    try {
-      loadedChecks.push(await module.check(url, fetchedData));
-    } catch (error) {
-      loadedChecks.push({ id, name: id, category: 'Assessment', status: 'error', testable: true, score: 0, findings: [{ title: `${id} check failed`, severity: 'info', status: 'error', evidence: error.message, impact: 'The check could not complete.', remediation: 'Retry the scan.', confidence: 'confirmed' }] });
-    }
-  }
+  const checkModules = {};
+  for (const [id, loader] of checkLoaders) checkModules[id] = await loader();
   const pageIntel = await import('./checks/page-intel.js');
-  const intel = await pageIntel.analyze(url, fetchedData, { timeout, signal });
-  loadedChecks.push(...intel.checks);
-  results.push(...loadedChecks);
-  loadedChecks.forEach(result => {
-    let status = 'passed';
-    if (result.status === 'failed' || result.status === 'error') status = 'failed';
-    else if (result.status === 'warning' || result.status === 'info') status = result.status === 'info' ? 'passed' : 'warning';
-    report(40 + Math.round((loadedChecks.indexOf(result) / loadedChecks.length) * 40), `${result.name || result.id} complete.`, { step: 'checks', check: { name: result.name || result.id, status } });
+
+  /* ── Site-level checks (once per origin) ─────────────────── */
+  report(6, 'Running site-level checks (TLS certificate, exposed files).', { step: 'init' });
+  const siteResults = [];
+  for (const id of SITE_LEVEL_CHECKS) {
+    if (!stillActive()) throw new Error('Scan cancelled');
+    report(lastPercent, '', { step: 'init', check: { name: CHECK_LABELS[id], status: 'running' } });
+    let result;
+    try { result = await checkModules[id].check(url, fetchedData); } catch (error) { result = checkError(id, error); }
+    siteResults.push(result);
+    report(lastPercent + 2, `${CHECK_LABELS[id]} complete.`, { step: 'init', check: { name: result.name || CHECK_LABELS[id], status: uiStatus(result) } });
+  }
+
+  /* ── Crawl + per-page checks ─────────────────────────────── */
+  const perPage = new Map();          // check id -> [{ pageUrl, result }]
+  const announced = new Set();
+  let landingIntel = null;
+  const pageIntelOutputs = [];
+  let lastStats = { discovered: 1, scanned: 0, queued: 0, failed: 0, skipped: 0, limit: crawlLimit };
+  const statsFor = (s) => ({ pagesFound: s.discovered, pagesChecked: s.scanned, queued: s.queued, errors: s.failed, limit: s.limit });
+
+  const record = (result, pageUrl) => {
+    const id = result.id;
+    if (!perPage.has(id)) perPage.set(id, []);
+    perPage.get(id).push({ pageUrl, result });
+    if (!announced.has(id)) {
+      announced.add(id);
+      report(lastPercent, '', { step: 'crawl', check: { name: result.name || CHECK_LABELS[id] || id, status: 'running' } });
+    }
+  };
+
+  async function scanPage(page) {
+    if (!stillActive()) throw new Error('Scan cancelled');
+    const pageData = {
+      response: { status: page.status, url: page.finalUrl, ok: page.status >= 200 && page.status < 400 },
+      headers: page.headers || {},
+      text: page.body || '',
+      finalUrl: page.finalUrl,
+      redirectChain: page.redirectChain || [page.url],
+    };
+    for (const [id] of checkLoaders) {
+      if (SITE_LEVEL_CHECKS.has(id)) continue;
+      let result;
+      try { result = await checkModules[id].check(page.finalUrl, pageData); } catch (error) { result = checkError(id, error); }
+      record(result, page.finalUrl);
+    }
+    const isLanding = page.source === 'start';
+    const intel = await pageIntel.analyze(page.finalUrl, pageData, { timeout, signal, siteLevel: isLanding });
+    if (isLanding) landingIntel = intel;
+    pageIntelOutputs.push(intel);
+    intel.checks.forEach(result => record(result, page.finalUrl));
+  }
+
+  report(12, 'Landing page loaded. Discovering pages from links, robots.txt and sitemap.xml.', { step: 'crawl', stats: { pagesFound: 1, pagesChecked: 0 } });
+  const crawl = await crawlSite({
+    startUrl: fetchedData.finalUrl,
+    landing: { body: fetchedData.text, headers: fetchedData.headers, status: fetchedData.response.status, finalUrl: fetchedData.finalUrl, redirectChain: fetchedData.redirectChain },
+    limit: crawlLimit,
+    concurrency,
+    timeout,
+    signal,
+    isActive: stillActive,
+    onPage: scanPage,
+    onProgress: (stats, event) => {
+      lastStats = stats;
+      const target = Math.max(1, Math.min(stats.limit, stats.scanned + stats.queued));
+      const percent = 12 + 76 * (stats.scanned / target);
+      const extra = { step: 'crawl', stats: statsFor(stats) };
+      if (event.type === 'fetch') report(percent, '', { ...extra, currentUrl: event.url });
+      else if (event.type === 'page') report(percent, `Scanned page ${stats.scanned}/${stats.limit}: ${event.url}`, extra);
+      else if (event.type === 'error') report(percent, `Could not scan ${event.url} (${event.error}).`, extra);
+      else if (event.type === 'sitemap') report(percent, `Sitemap ${event.url} listed ${event.entries} URL(s).`, extra);
+      else if (event.type === 'phase') report(percent, event.message, extra);
+      else report(percent, '', extra);
+    },
+  });
+  if (!stillActive()) throw new Error('Scan cancelled');
+  const scannedPages = crawl.pages;
+  report(89, `Crawl finished: ${scannedPages.length} page(s) scanned, ${crawl.stats.discovered} discovered (${crawl.stats.stopReason}).`, { step: 'analysis', stats: statsFor(crawl.stats) });
+
+  /* ── Merge results ───────────────────────────────────────── */
+  const results = [...siteResults];
+  perPage.forEach(entries => results.push(mergeCheckResults(entries, scannedPages.length)));
+  results.forEach(result => {
+    if (SITE_LEVEL_CHECKS.has(result.id)) return;
+    report(90, '', { step: 'analysis', check: { name: result.name || CHECK_LABELS[result.id] || result.id, status: uiStatus(result) } });
   });
   unavailableChecks.forEach(([id, name, limitation]) => {
     results.push({
@@ -198,8 +285,17 @@ export async function startScan(rawUrl, options = {}, onProgress = () => {}) {
       summary: limitation, limitation,
     });
   });
-  report(90, 'Calculating score and saving results.', { step: 'analysis' });
+
+  report(92, 'Calculating score and saving results.', { step: 'analysis' });
   const scored = scoreResults(results);
+  const intel = landingIntel || { attackSurface: {}, quality: {}, privacy: {}, vulnIntel: { libraries: [], cves: [] } };
+  const allIntel = pageIntelOutputs.length ? pageIntelOutputs : [intel];
+  const libraries = [];
+  const libraryKeys = new Set();
+  allIntel.flatMap(item => item.vulnIntel?.libraries || []).forEach(library => {
+    const key = `${library.name}|${library.version}`;
+    if (!libraryKeys.has(key)) { libraryKeys.add(key); libraries.push(library); }
+  });
   const finalScan = {
     ...scan,
     status: 'complete',
@@ -210,15 +306,35 @@ export async function startScan(rawUrl, options = {}, onProgress = () => {}) {
     summary: scored.summary,
     findings: scored.findings,
     checks: results,
-    attackSurface: { ...intel.attackSurface, endpoints: [...new Set([...(intel.attackSurface.endpoints || []), ...pages.map(page => page.url)])].slice(0, 50), pages },
+    attackSurface: {
+      ...intel.attackSurface,
+      externalDomains: unique(allIntel.flatMap(item => item.attackSurface?.externalDomains || [])).slice(0, 100),
+      technologies: unique(allIntel.flatMap(item => item.attackSurface?.technologies || [])),
+      externalScripts: unique(allIntel.flatMap(item => item.attackSurface?.externalScripts || [])).slice(0, 100),
+      endpoints: unique([...scannedPages.map(page => page.url), ...(intel.attackSurface?.endpoints || [])]).slice(0, 200),
+      pages: scannedPages,
+    },
     quality: intel.quality,
-    privacy: intel.privacy,
-    vulnIntel: intel.vulnIntel,
+    privacy: {
+      ...intel.privacy,
+      trackers: unique(allIntel.flatMap(item => item.privacy?.trackers || [])),
+      externalDomains: unique(allIntel.flatMap(item => item.privacy?.externalDomains || [])).slice(0, 100),
+    },
+    vulnIntel: { ...(intel.vulnIntel || {}), libraries },
+    crawl: {
+      ...crawl.stats,
+      sitemaps: crawl.sitemaps,
+      failures: crawl.failures.slice(0, 100),
+      skipped: crawl.skipped.slice(0, 100),
+      unvisited: crawl.unvisited,
+      concurrency,
+    },
     fetched: { finalUrl: fetchedData.finalUrl, status: fetchedData.response.status },
   };
   await saveScan(finalScan);
   setState({ activeScan: null, currentScan: finalScan, scanResults: finalScan, viewScanId: finalScan.id });
-  report(100, 'Scan complete.', { step: 'complete', complete: true, result: finalScan, stats: { pagesFound: pages.length, pagesChecked: pages.length, passed: scored.summary.passed, failed: scored.summary.failed } });
+  report(100, 'Scan complete.', { step: 'complete', complete: true, result: finalScan, stats: { ...statsFor(crawl.stats), passed: scored.summary.passed, failed: scored.summary.failed } });
+  void lastStats;
   return finalScan;
 }
 

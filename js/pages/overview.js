@@ -2,6 +2,11 @@
 import { setState } from '../state.js';
 import { getAllScans } from '../storage.js';
 
+function cssVar(name, fallback) {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
 export async function render(container) {
   container.innerHTML = '';
 
@@ -42,166 +47,166 @@ export async function render(container) {
     ['package-search', lastScan?.vulnIntel?.libraries?.length || 0, 'Dependencies flagged', 'text-secondary'],
   ];
 
+  const severityRows = ['critical', 'high', 'medium', 'low'].map(key => [key, Number(lastSummary[key] || 0)]);
+  const severityMax = Math.max(1, ...severityRows.map(([, count]) => count));
+  const lastGrade = getGrade(lastScan?.score || 0);
+  const verdict = !lastScan ? '' : (lastScan.score >= 75 ? 'Strong security posture' : lastScan.score >= 50 ? 'Review recommended' : 'Attention required');
+
   container.innerHTML = `
     <div class="page-header">
       <div>
-        <h1 class="page-title"><i data-lucide="shield"></i> WebGuard Security Platform</h1>
-        <p class="page-subtitle">Website security assessment and vulnerability intelligence</p>
+        <h1 class="page-title"><i data-lucide="layout-dashboard"></i> Security Overview</h1>
+        <p class="page-subtitle">${lastScan
+          ? `Latest assessment of <strong>${escHtml(lastScan.url)}</strong> · ${escHtml(new Date(lastScan.startTime).toLocaleString())}`
+          : 'Website security assessment and vulnerability intelligence'}</p>
+      </div>
+      <div class="page-header-actions">
+        ${lastScan ? '<a href="#" class="btn btn-secondary" data-nav="reports"><i data-lucide="file-text"></i> Report</a>' : ''}
+        <a href="#" class="btn btn-primary" data-nav="new-scan"><i data-lucide="plus"></i> New scan</a>
       </div>
     </div>
 
     <!-- Scan Form Card -->
-    <div class="card scan-form-card mb-4">
+    <section class="card scan-form-card mb-4" aria-label="Run a security scan">
       <div class="scan-form-inner">
-        <h2 class="card-title mb-2"><i data-lucide="search"></i> Security Scan</h2>
-        <p class="text-secondary mb-3">Enter a URL to perform a comprehensive security assessment.</p>
+        <div class="scan-form-intro">
+          <h2 class="card-title mb-2"><i data-lucide="radar"></i> Run an assessment</h2>
+          <p class="text-secondary">Enter a URL to perform a comprehensive security assessment across all 26 check categories.</p>
+        </div>
         <form id="overview-scan-form">
-          <div class="input-group mb-3">
-            <i data-lucide="globe" class="input-icon"></i>
-            <input id="overview-url-input" class="input input-with-icon" type="url"
-              placeholder="https://example.com" required autocomplete="url" />
-          </div>
-          <div class="scan-mode-toggle mb-3">
-            <span class="label">Scan Mode:</span>
-            <label class="toggle-option">
-              <input type="radio" name="overview-mode" value="passive" checked />
-              <span class="toggle-btn">
-                <i data-lucide="eye"></i> Passive
-              </span>
-            </label>
-            <label class="toggle-option">
-              <input type="radio" name="overview-mode" value="verified" />
-              <span class="toggle-btn">
-                <i data-lucide="shield-check"></i> Verified
-              </span>
-            </label>
-          </div>
-          <div class="scan-mode-desc mb-3">
-            <div id="mode-desc-passive" class="mode-desc">
-              <i data-lucide="info"></i>
-              <strong>Passive:</strong> Read-only analysis — no authentication or form submission. Safe for any site.
+          <div class="scan-form-row">
+            <div class="input-group">
+              <i data-lucide="globe" class="input-icon"></i>
+              <input id="overview-url-input" class="input input-with-icon" type="url"
+                placeholder="https://example.com" required autocomplete="url" aria-label="Target URL" />
             </div>
-            <div id="mode-desc-verified" class="mode-desc hidden">
-              <i data-lucide="alert-triangle"></i>
-              <strong>Verified:</strong> Performs additional active checks. Only use on sites you own or have permission to test.
+            <button type="submit" class="btn btn-primary btn-lg">
+              <i data-lucide="play"></i> Start Security Scan
+            </button>
+          </div>
+          <div class="scan-form-options">
+            <div class="scan-mode-toggle">
+              <span class="label">Mode</span>
+              <label class="toggle-option">
+                <input type="radio" name="overview-mode" value="passive" checked />
+                <span class="toggle-btn"><i data-lucide="eye"></i> Passive</span>
+              </label>
+              <label class="toggle-option">
+                <input type="radio" name="overview-mode" value="verified" />
+                <span class="toggle-btn"><i data-lucide="shield-check"></i> Verified</span>
+              </label>
+            </div>
+            <div class="scan-mode-desc">
+              <div id="mode-desc-passive" class="mode-desc">
+                <i data-lucide="info"></i>
+                <span><strong>Passive:</strong> Read-only analysis — no authentication or form submission. Safe for any site.</span>
+              </div>
+              <div id="mode-desc-verified" class="mode-desc hidden">
+                <i data-lucide="alert-triangle"></i>
+                <span><strong>Verified:</strong> Performs additional active checks. Only use on sites you own or have permission to test.</span>
+              </div>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary btn-lg" style="width:100%">
-            <i data-lucide="play"></i> Start Security Scan
-          </button>
         </form>
       </div>
-    </div>
+    </section>
 
-    <!-- Stats Row -->
-    <div class="stats-row mb-4">
+    <!-- KPI grid -->
+    <section class="kpi-grid mb-4" aria-label="Key metrics">
       ${dashboardStats.map(([icon, value, label, tone]) => `<div class="stat-card"><div class="stat-icon ${tone}"><i data-lucide="${icon}"></i></div><div class="stat-value ${tone}">${value}</div><div class="stat-label">${label}</div></div>`).join('')}
-    </div>
+    </section>
 
-    <!-- Two-column layout -->
-    <div class="two-col-grid mb-4">
-      <!-- Recent Scans -->
-      <div class="card">
+    <div class="dash-grid">
+      <!-- Security posture -->
+      <section class="card card-fill span-4 pair">
         <div class="card-header">
-          <h3 class="card-title"><i data-lucide="history"></i> Recent Scans</h3>
-          <a href="#" class="btn btn-ghost btn-sm" data-nav="scan-history">View All</a>
+          <div><h3 class="card-title"><i data-lucide="shield"></i> Security posture</h3><p class="card-subtitle">Score and open findings by severity</p></div>
+          ${lastScan ? `<span class="badge ${lastGrade.cls}">Grade ${lastGrade.grade}</span>` : ''}
         </div>
-        ${recentScans.length === 0
-          ? `<div class="empty-state">
-              <i data-lucide="shield-off"></i>
-              <p>No scans yet. Run your first scan above!</p>
-            </div>`
-          : `<table class="table">
-              <thead>
-                <tr>
-                  <th>Target</th>
-                  <th>Score</th>
-                  <th>Grade</th>
-                  <th>Date</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                ${recentScans.map(scan => {
-                  const { grade, cls } = getGrade(scan.score || 0);
-                  return `<tr>
-                    <td class="truncate" style="max-width:150px" title="${escHtml(scan.url)}">${escHtml(scan.url)}</td>
-                    <td>${scan.score || 0}</td>
-                    <td><span class="badge ${cls}">${grade}</span></td>
-                    <td>${new Date(scan.startTime).toLocaleDateString()}</td>
-                    <td><a href="#" class="btn btn-ghost btn-sm view-scan-btn" data-scan-id="${escHtml(scan.id)}">View</a></td>
-                  </tr>`;
-                }).join('')}
-              </tbody>
-            </table>`
-        }
-      </div>
-
-      <!-- Risk Distribution Chart -->
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title"><i data-lucide="pie-chart"></i> Risk Distribution</h3>
-        </div>
-        ${lastScan
-          ? `<div class="chart-container" style="position:relative;height:220px;display:flex;align-items:center;justify-content:center;">
-              <canvas id="risk-chart"></canvas>
-            </div>`
-          : `<div class="empty-state">
-              <i data-lucide="pie-chart"></i>
-              <p>Run a scan to see risk distribution</p>
-            </div>`
-        }
-      </div>
-    </div>
-
-    <div class="dashboard-intel-grid mb-4">
-      <div class="card website-context-card">
-        <div class="card-header"><div><h3 class="card-title"><i data-lucide="globe-2"></i> Website context</h3><p class="card-subtitle">Latest inspected surface</p></div><span class="badge badge-info">${lastScan ? 'Inspected' : 'Awaiting scan'}</span></div>
-        ${lastScan ? `<div class="website-context-domain">${escHtml(lastScan.url)}</div><div class="website-context-meta"><span><strong>${lastSurface.pages?.length || 0}</strong> pages</span><span><strong>${lastSurface.externalDomains?.length || 0}</strong> external domains</span><span><strong>${lastSurface.endpoints?.length || 0}</strong> endpoints</span></div><div class="website-context-tags">${(lastSurface.technologies || []).slice(0, 5).map(tech => `<span>${escHtml(tech)}</span>`).join('') || '<span>No technology banners disclosed</span>'}</div>` : '<div class="empty-state compact-empty"><i data-lucide="scan-search"></i><p>Run a scan to build the website profile.</p></div>'}
-      </div>
-      <div class="card recent-findings-card">
-        <div class="card-header"><div><h3 class="card-title"><i data-lucide="triangle-alert"></i> Important findings</h3><p class="card-subtitle">Prioritised from the latest scan</p></div><a href="#" class="btn btn-ghost btn-sm" data-nav="findings">Open queue</a></div>
-        ${recentFindings.length ? `<div class="dashboard-finding-list">${recentFindings.map(finding => `<div class="dashboard-finding-item"><span class="severity-dot severity-dot--${escHtml(finding.severity || 'info')}"></span><div><strong>${escHtml(finding.title || 'Finding')}</strong><small>${escHtml(finding.category || 'General')}</small></div><span class="badge ${finding.status === 'failed' ? 'badge-failed' : 'badge-warning'}">${escHtml(finding.status || 'info')}</span></div>`).join('')}</div>` : '<div class="empty-state compact-empty"><i data-lucide="check-circle-2"></i><p>No unresolved findings in the latest scan.</p></div>'}
-      </div>
-    </div>
-
-    <!-- Security Score Overview -->
-    ${lastScan ? (() => {
-      const { grade, cls } = getGrade(lastScan.score || 0);
-      return `
-      <div class="card mb-4">
-        <div class="card-header">
-          <h3 class="card-title"><i data-lucide="shield"></i> Last Scan Overview</h3>
-          <span class="text-muted">${escHtml(lastScan.url)}</span>
-        </div>
-        <div class="score-overview-row">
-          <div class="score-overview-score">
+        ${lastScan ? `
+          <div class="posture-body">
             <div class="score-ring-wrap">
-              <svg class="score-ring" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="50" fill="none" stroke="var(--border-color)" stroke-width="10"/>
-                <circle cx="60" cy="60" r="50" fill="none" stroke="var(--color-primary)" stroke-width="10"
+              <svg class="score-ring" viewBox="0 0 120 120" aria-hidden="true">
+                <circle cx="60" cy="60" r="50" fill="none" stroke="var(--surface-3)" stroke-width="10"/>
+                <circle cx="60" cy="60" r="50" fill="none" stroke="var(--accent)" stroke-width="10"
                   stroke-dasharray="${Math.round((lastScan.score || 0) / 100 * 314)} 314"
                   stroke-linecap="round" transform="rotate(-90 60 60)"/>
               </svg>
               <div class="score-ring-label">
                 <span class="score-value">${lastScan.score || 0}</span>
-                <span class="score-grade badge ${cls}">${grade}</span>
+                <span class="text-muted" style="font-size:0.75rem">of 100</span>
               </div>
             </div>
+            <div class="severity-bars">
+              ${severityRows.map(([key, count]) => `
+                <div class="severity-bar severity-bar--${key}">
+                  <span style="text-transform:capitalize">${key}</span>
+                  <div class="severity-bar-track"><div class="severity-bar-fill" style="width:${Math.round(count / severityMax * 100)}%"></div></div>
+                  <strong>${count}</strong>
+                </div>`).join('')}
+            </div>
           </div>
-          <div class="score-overview-stats">
-            <div class="finding-stat"><span class="badge badge-critical">Critical</span> <strong>${lastScan.summary?.critical || 0}</strong></div>
-            <div class="finding-stat"><span class="badge badge-high">High</span> <strong>${lastScan.summary?.high || 0}</strong></div>
-            <div class="finding-stat"><span class="badge badge-medium">Medium</span> <strong>${lastScan.summary?.medium || 0}</strong></div>
-            <div class="finding-stat"><span class="badge badge-low">Low</span> <strong>${lastScan.summary?.low || 0}</strong></div>
-          </div>
-          <div class="score-overview-actions">
-            <a href="#" class="btn btn-primary" data-nav="findings">View Findings</a>
-            <a href="#" class="btn btn-secondary" data-nav="reports">Generate Report</a>
-          </div>
+          <div class="posture-verdict">
+            <strong>${verdict}</strong>
+            <a href="#" class="btn btn-ghost btn-sm" data-nav="findings">View findings <i data-lucide="arrow-right"></i></a>
+          </div>`
+        : `<div class="empty-state compact-empty"><i data-lucide="shield-off"></i><p>Run a scan to calculate the security score.</p></div>`}
+      </section>
+
+      <!-- Risk Distribution Chart -->
+      <section class="card card-fill span-4 pair">
+        <div class="card-header">
+          <div><h3 class="card-title"><i data-lucide="pie-chart"></i> Risk distribution</h3><p class="card-subtitle">All checks from the latest scan</p></div>
         </div>
-      </div>`;
-    })() : ''}
+        ${lastScan
+          ? `<div class="chart-container"><canvas id="risk-chart" aria-label="Risk distribution chart"></canvas></div>`
+          : `<div class="empty-state compact-empty"><i data-lucide="pie-chart"></i><p>Run a scan to see risk distribution.</p></div>`}
+      </section>
+
+      <!-- Website context -->
+      <section class="card card-fill website-context-card span-4">
+        <div class="card-header"><div><h3 class="card-title"><i data-lucide="globe-2"></i> Website context</h3><p class="card-subtitle">Latest inspected surface</p></div><span class="badge badge-info">${lastScan ? 'Inspected' : 'Awaiting scan'}</span></div>
+        ${lastScan ? `<div class="website-context-domain" title="${escHtml(lastScan.url)}">${escHtml(lastScan.url)}</div><div class="website-context-meta"><span><strong>${lastSurface.pages?.length || 0}</strong> pages</span><span><strong>${lastSurface.externalDomains?.length || 0}</strong> ext. domains</span><span><strong>${lastSurface.endpoints?.length || 0}</strong> endpoints</span></div><div class="website-context-tags">${(lastSurface.technologies || []).slice(0, 6).map(tech => `<span>${escHtml(tech.name || tech)}</span>`).join('') || '<span>No technology banners disclosed</span>'}</div>` : '<div class="empty-state compact-empty"><i data-lucide="scan-search"></i><p>Run a scan to build the website profile.</p></div>'}
+      </section>
+
+      <!-- Recent Scans -->
+      <section class="card card-fill span-7">
+        <div class="card-header">
+          <div><h3 class="card-title"><i data-lucide="history"></i> Recent scans</h3><p class="card-subtitle">${scans.length} stored in this browser</p></div>
+          <a href="#" class="btn btn-ghost btn-sm" data-nav="scan-history">View all <i data-lucide="arrow-right"></i></a>
+        </div>
+        ${recentScans.length === 0
+          ? `<div class="empty-state compact-empty">
+              <i data-lucide="shield-off"></i>
+              <p>No scans yet. Run your first scan above.</p>
+            </div>`
+          : `<table class="table">
+              <thead>
+                <tr><th>Target</th><th>Score</th><th>Grade</th><th>Critical</th><th>Date</th><th></th></tr>
+              </thead>
+              <tbody>
+                ${recentScans.map(scan => {
+                  const { grade, cls } = getGrade(scan.score || 0);
+                  return `<tr>
+                    <td class="truncate scan-url-cell" title="${escHtml(scan.url)}">${escHtml(scan.url)}</td>
+                    <td><strong>${scan.score || 0}</strong></td>
+                    <td><span class="badge ${cls}">${grade}</span></td>
+                    <td class="${scan.summary?.critical ? 'text-critical' : ''}">${scan.summary?.critical || 0}</td>
+                    <td>${new Date(scan.startTime).toLocaleDateString()}</td>
+                    <td style="text-align:right"><a href="#" class="btn btn-ghost btn-sm view-scan-btn" data-scan-id="${escHtml(scan.id)}">View</a></td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>`
+        }
+      </section>
+
+      <!-- Important findings -->
+      <section class="card card-fill recent-findings-card span-5">
+        <div class="card-header"><div><h3 class="card-title"><i data-lucide="triangle-alert"></i> Important findings</h3><p class="card-subtitle">Prioritised from the latest scan</p></div><a href="#" class="btn btn-ghost btn-sm" data-nav="findings">Open queue <i data-lucide="arrow-right"></i></a></div>
+        ${recentFindings.length ? `<div class="dashboard-finding-list">${recentFindings.map(finding => `<div class="dashboard-finding-item"><span class="severity-dot severity-dot--${escHtml(finding.severity || 'info')}"></span><div><strong title="${escHtml(finding.title || 'Finding')}">${escHtml(finding.title || 'Finding')}</strong><small>${escHtml(finding.category || 'General')}</small></div><span class="badge ${finding.status === 'failed' ? 'badge-failed' : 'badge-warning'}">${escHtml(finding.status || 'info')}</span></div>`).join('')}</div>` : '<div class="empty-state compact-empty"><i data-lucide="check-circle-2"></i><p>No unresolved findings in the latest scan.</p></div>'}
+      </section>
+    </div>
   `;
 
   // After DOM ready, wire up events
@@ -260,14 +265,21 @@ export async function render(container) {
               lastScan.summary?.low || 0,
               lastScan.summary?.passed || 0
             ],
-            backgroundColor: ['#EF4444','#F97316','#EAB308','#3B82F6','#22C55E'],
-            borderWidth: 2,
-            borderColor: '#121C2D'
+            backgroundColor: ['--sev-critical', '--sev-high', '--sev-medium', '--sev-low', '--sev-passed'].map(name => cssVar(name, '#888')),
+            borderWidth: 3,
+            borderColor: cssVar('--surface', '#111827'),
+            hoverOffset: 4
           }]
         },
         options: {
-          cutout: '65%',
-          plugins: { legend: { position: 'bottom', labels: { color: '#CBD5E1', font: { size: 12 } } } }
+          maintainAspectRatio: false,
+          cutout: '68%',
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: { color: cssVar('--text-2', '#aab6c9'), usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 14, font: { size: 12, family: 'Inter' } }
+            }
+          }
         }
       });
     }

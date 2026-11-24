@@ -26,9 +26,9 @@ export async function render(container) {
       const settings = state.settings || {};
       await startScan(container, _scanUrl, {
         mode,
-        crawlLimit: settings.crawlLimit || 25,
+        crawlLimit: settings.crawlLimit || 100,
         timeout: Number(settings.timeout) > 1000 ? Math.round(settings.timeout / 1000) : (settings.timeout || 30),
-        concurrency: settings.concurrency || 3,
+        concurrency: settings.concurrency || 4,
       });
       return;
     }
@@ -40,6 +40,8 @@ export async function render(container) {
 function renderIdle(container) {
   const state = getState();
   const prefillUrl = _scanUrl || state.pendingScanUrl || '';
+  const defaultLimit = Math.max(10, Math.min(Number(state.settings?.crawlLimit) || 100, 500));
+  const defaultConcurrency = Math.max(1, Math.min(Number(state.settings?.concurrency) || 4, 8));
 
   container.innerHTML = `
     <div class="page-header">
@@ -49,8 +51,11 @@ function renderIdle(container) {
       </div>
     </div>
 
-    <div class="card scan-config-card" style="max-width:720px;margin:0 auto;">
-      <h2 class="card-title mb-4"><i data-lucide="settings-2"></i> Scan Configuration</h2>
+    <div class="scan-layout">
+    <div class="card scan-config-card">
+      <div class="card-header">
+        <div><h2 class="card-title"><i data-lucide="settings-2"></i> Scan Configuration</h2><p class="card-subtitle">Target, mode and crawl depth for this assessment</p></div>
+      </div>
 
       <div class="form-group mb-3">
         <label class="label" for="ns-url">Target URL</label>
@@ -79,11 +84,12 @@ function renderIdle(container) {
       </div>
 
       <div class="form-group mb-3">
-        <label class="label" for="ns-crawl">Crawl Limit: <span id="ns-crawl-val">250</span> pages</label>
-        <input id="ns-crawl" type="range" min="50" max="500" step="10" value="250" class="range-input" />
+        <label class="label" for="ns-crawl">Crawl Limit: <span id="ns-crawl-val">${defaultLimit}</span> pages</label>
+        <input id="ns-crawl" type="range" min="10" max="500" step="10" value="${defaultLimit}" class="range-input" />
         <div class="range-marks">
-          <span>50</span><span>250</span><span>500</span>
+          <span>10</span><span>100</span><span>250</span><span>500</span>
         </div>
+        <p class="text-muted mt-1" style="font-size:0.8rem">Pages are discovered from links on every page, robots.txt and sitemap.xml. Each accessible page runs the full page-level check set.</p>
       </div>
 
       <details class="advanced-options mb-4">
@@ -97,8 +103,8 @@ function renderIdle(container) {
               <input id="ns-timeout" class="input" type="number" value="30" min="5" max="120" />
             </div>
             <div class="form-group">
-              <label class="label" for="ns-concurrency">Concurrency</label>
-              <input id="ns-concurrency" class="input" type="number" value="5" min="1" max="20" />
+              <label class="label" for="ns-concurrency">Concurrency (parallel requests)</label>
+              <input id="ns-concurrency" class="input" type="number" value="${defaultConcurrency}" min="1" max="8" />
             </div>
           </div>
         </div>
@@ -113,11 +119,24 @@ function renderIdle(container) {
         </button>
       </div>
 
-      <div class="mt-3 alert-info" style="font-size:0.85rem;">
+      <div class="mt-4 alert-info">
         <i data-lucide="shield"></i>
-        <strong>Ethical Notice:</strong> Only scan websites you own or have explicit permission to test.
-        WebGuard performs non-destructive, passive analysis only.
+        <span><strong>Ethical Notice:</strong> Only scan websites you own or have explicit permission to test.
+        WebGuard performs non-destructive, passive analysis only.</span>
       </div>
+    </div>
+
+    <aside class="scan-aside">
+      <div class="card">
+        <div class="card-header">
+          <div><h3 class="card-title"><i data-lucide="list-checks"></i> Assessment coverage</h3><p class="card-subtitle">Every scan runs these categories</p></div>
+          <span class="coverage-count">${SECURITY_MODULES.length}</span>
+        </div>
+        <ol class="coverage-list">
+          ${SECURITY_MODULES.map((name, index) => `<li class="coverage-item"><span class="coverage-index">${String(index + 1).padStart(2, '0')}</span>${escHtml(name)}</li>`).join('')}
+        </ol>
+      </div>
+    </aside>
     </div>
   `;
 
@@ -147,9 +166,9 @@ function renderIdle(container) {
     const url = container.querySelector('#ns-url')?.value.trim();
     if (!url) { alert('Please enter a URL to scan.'); return; }
     const mode = container.querySelector('input[name="ns-mode"]:checked')?.value || 'passive';
-    const crawlLimit = parseInt(container.querySelector('#ns-crawl')?.value || '250');
+    const crawlLimit = parseInt(container.querySelector('#ns-crawl')?.value || '100');
     const timeout = parseInt(container.querySelector('#ns-timeout')?.value || '30');
-    const concurrency = parseInt(container.querySelector('#ns-concurrency')?.value || '5');
+    const concurrency = parseInt(container.querySelector('#ns-concurrency')?.value || '4');
     await startScan(container, url, { mode, crawlLimit, timeout, concurrency });
   });
   container.querySelector('#ns-url')?.addEventListener('keydown', (event) => {
@@ -176,7 +195,7 @@ const CHECK_STEPS = [
   { id: 'complete', name: 'Complete' }
 ];
 
-const SECURITY_MODULES = [
+export const SECURITY_MODULES = [
   'HTTPS / Protocol Security', 'TLS Certificate', 'Security Headers',
   'Content Security Policy (CSP)', 'Exposed Sensitive Files', 'Cookie Security',
   'CORS Headers', 'Forms and Input', 'Mixed Content', 'JavaScript Libraries',
@@ -248,6 +267,7 @@ function renderScanning(container, url, options) {
         </div>
         <span id="ns-progress-pct" class="progress-pct">0%</span>
       </div>
+      <div class="scan-current mb-3" id="ns-current"><i data-lucide="loader"></i><span>Now scanning</span><code id="ns-current-url">${escHtml(url)}</code></div>
 
       <!-- Steps -->
       <div class="scan-steps mb-3">
@@ -262,10 +282,12 @@ function renderScanning(container, url, options) {
 
       <!-- Stats bar -->
       <div class="scan-stats-bar mb-3">
-        <div class="scan-stat"><span id="stat-pages-found">0</span><span>Pages Found</span></div>
-        <div class="scan-stat"><span id="stat-pages-checked">0</span><span>Checked</span></div>
-        <div class="scan-stat"><span id="stat-passed">0</span><span>Passed</span></div>
-        <div class="scan-stat text-critical"><span id="stat-failed">0</span><span>Failed</span></div>
+        <div class="scan-stat"><span id="stat-pages-found">0</span><span>Pages discovered</span></div>
+        <div class="scan-stat"><span><b id="stat-pages-checked">0</b><small> / <b id="stat-limit">${escHtml(options.crawlLimit || 100)}</b></small></span><span>Pages scanned</span></div>
+        <div class="scan-stat"><span id="stat-queued">0</span><span>In queue</span></div>
+        <div class="scan-stat"><span id="stat-errors">0</span><span>Unreachable</span></div>
+        <div class="scan-stat"><span id="stat-passed">–</span><span>Checks passed</span></div>
+        <div class="scan-stat text-critical"><span id="stat-failed">–</span><span>Checks failed</span></div>
       </div>
 
       <button id="ns-cancel-btn" class="btn btn-danger">
@@ -273,9 +295,12 @@ function renderScanning(container, url, options) {
       </button>
     </div>
 
+    <div class="scan-run-grid">
     <!-- Live check list -->
-    <div class="card mb-3">
-      <h3 class="card-title mb-3"><i data-lucide="list-checks"></i> Security Checks</h3>
+    <div class="card">
+      <div class="card-header">
+        <div><h3 class="card-title"><i data-lucide="list-checks"></i> Security Checks</h3><p class="card-subtitle">Live status for all ${SECURITY_MODULES.length} assessment categories</p></div>
+      </div>
       <div class="check-list" id="ns-check-list">
         ${SECURITY_MODULES.map(m => `
           <div class="check-item" id="check-${m.replace(/[^a-z0-9]/gi, '-').toLowerCase()}">
@@ -289,8 +314,11 @@ function renderScanning(container, url, options) {
 
     <!-- Scan log -->
     <div class="card">
-      <h3 class="card-title mb-2"><i data-lucide="terminal"></i> Scan Log</h3>
+      <div class="card-header">
+        <div><h3 class="card-title"><i data-lucide="terminal"></i> Scan Log</h3><p class="card-subtitle">Most recent 20 events</p></div>
+      </div>
       <div class="scan-log" id="ns-scan-log"></div>
+    </div>
     </div>
   `;
 
@@ -337,12 +365,20 @@ function updateProgress(container, progress) {
 
   // Update stats
   if (progress.stats) {
-    const { pagesFound, pagesChecked, passed, failed } = progress.stats;
+    const { pagesFound, pagesChecked, queued, errors, limit, passed, failed } = progress.stats;
     const sf = (id, val) => { const el = container.querySelector(id); if (el && val !== undefined) el.textContent = val; };
     sf('#stat-pages-found', pagesFound);
     sf('#stat-pages-checked', pagesChecked);
+    sf('#stat-queued', queued);
+    sf('#stat-errors', errors);
+    sf('#stat-limit', limit);
     sf('#stat-passed', passed);
     sf('#stat-failed', failed);
+  }
+
+  if (progress.currentUrl) {
+    const current = container.querySelector('#ns-current-url');
+    if (current) current.textContent = progress.currentUrl;
   }
 
   // Update check status
@@ -399,6 +435,8 @@ function renderComplete(container, result) {
     ? `${Math.floor(durationMs / 60000)}m ${Math.round((durationMs % 60000) / 1000)}s`
     : `${Math.max(1, Math.round(durationMs / 1000))}s`;
   const pages = result.attackSurface?.pages?.length || 0;
+  const crawl = result.crawl || {};
+  const discovered = crawl.discovered ?? pages;
   const totalFindings = result.summary?.total ?? result.findings?.length ?? 0;
   container.innerHTML = `
     <div class="scan-complete-page">
@@ -421,8 +459,10 @@ function renderComplete(container, result) {
           <span class="scan-result-kicker">Final result</span>
           <h2>${score >= 75 ? 'Strong security posture' : score >= 50 ? 'Review recommended' : 'Attention required'}</h2>
           <p>${totalFindings} finding${totalFindings === 1 ? '' : 's'} recorded across ${pages} scanned page${pages === 1 ? '' : 's'}.</p>
+          ${crawl.stopReason ? `<p class="text-muted" style="font-size:0.8rem;margin-top:4px">Crawl: ${escHtml(crawl.stopReason)}${crawl.failed ? ` · ${crawl.failed} unreachable` : ''}${crawl.sitemapUrls ? ` · ${crawl.sitemapUrls} sitemap URL${crawl.sitemapUrls === 1 ? '' : 's'}` : ''}</p>` : ''}
         </div>
         <div class="scan-complete-metrics">
+          <div><span>Pages discovered</span><strong>${discovered}</strong></div>
           <div><span>Pages scanned</span><strong>${pages}</strong></div>
           <div><span>Total findings</span><strong>${totalFindings}</strong></div>
           <div><span>Duration</span><strong>${duration}</strong></div>

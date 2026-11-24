@@ -18,7 +18,7 @@ const defaultState = {
   // Settings
   settings: {
     theme: 'dark',
-    crawlLimit: 250,
+    crawlLimit: 100,
     timeout: 10000,
     concurrency: 3,
     retentionDays: 90,

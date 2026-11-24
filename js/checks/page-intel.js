@@ -136,14 +136,18 @@ export async function analyze(url, fetchedData, options = {}) {
   const externalScripts = resources.filter(item => item.tag === 'script' && (() => { try { return new URL(item.url).origin !== pageUrl.origin; } catch { return false; } })());
   const missingSri = externalScripts.filter(item => !item.integrity);
 
+  // Site-level resources are fetched once per scan (on the landing page) rather than for every page.
+  const siteLevel = options.siteLevel !== false;
   let robots = null;
   let securityTxt = null;
-  try {
-    robots = await proxyFetch(new URL('/robots.txt', pageUrl.origin).href, { method: 'GET', timeout: options.timeout, signal: options.signal, maxBytes: 80000 });
-  } catch { robots = null; }
-  try {
-    securityTxt = await proxyFetch(new URL('/.well-known/security.txt', pageUrl.origin).href, { method: 'GET', timeout: options.timeout, signal: options.signal, maxBytes: 80000 });
-  } catch { securityTxt = null; }
+  if (siteLevel) {
+    try {
+      robots = await proxyFetch(new URL('/robots.txt', pageUrl.origin).href, { method: 'GET', timeout: options.timeout, signal: options.signal, maxBytes: 80000 });
+    } catch { robots = null; }
+    try {
+      securityTxt = await proxyFetch(new URL('/.well-known/security.txt', pageUrl.origin).href, { method: 'GET', timeout: options.timeout, signal: options.signal, maxBytes: 80000 });
+    } catch { securityTxt = null; }
+  }
 
   const checks = [
     checkResult('cookies', 'Cookie Security', 'Session Security', cookieFindings(headers['set-cookie'], isHttps)),
@@ -152,11 +156,11 @@ export async function analyze(url, fetchedData, options = {}) {
     checkResult('mixed-content', 'Mixed Content', 'Transport Security', mixedFindings(mixed, isHttps)),
     checkResult('libraries', 'JavaScript Libraries', 'Vulnerability Intelligence', libraryFindings(libraries)),
     checkResult('technology', 'Technology Signals', 'Attack Surface', technologyFindings(technologies)),
-    checkResult('security-txt', 'security.txt', 'Disclosure', securityTxtFindings(securityTxt)),
+    ...(siteLevel ? [checkResult('security-txt', 'security.txt', 'Disclosure', securityTxtFindings(securityTxt))] : []),
     checkResult('redirects', 'Redirect Behaviour', 'Transport Security', redirectFindings(fetchedData.redirectChain || [], isHttps)),
     checkResult('cache-security', 'Cache Headers', 'HTTP Security Headers', cacheFindings(headers)),
     checkResult('sri', 'Subresource Integrity', 'Application Security', sriFindings(externalScripts, missingSri)),
-    checkResult('robots-sitemap', 'Robots and Sitemap', 'Attack Surface', robotsFindings(robots)),
+    ...(siteLevel ? [checkResult('robots-sitemap', 'Robots and Sitemap', 'Attack Surface', robotsFindings(robots))] : []),
     checkResult('privacy-trackers', 'Privacy and Trackers', 'Privacy', trackerFindings(trackers, external)),
   ];
 

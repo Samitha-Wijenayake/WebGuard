@@ -1,23 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>WebGuard – Security Platform</title>
 
-  <!-- Google Fonts -->
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
-  <!-- CSS -->
-  <link rel="stylesheet" href="css/style.css" />
+  <!-- Design system -->
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/components.css" />
-  <link rel="stylesheet" href="css/dashboard.css" />
-  <link rel="stylesheet" href="css/scanner.css" />
-  <link rel="stylesheet" href="css/reports.css" />
-  <link rel="stylesheet" href="css/responsive.css" />
-  <link rel="stylesheet" href="css/webguard-template.css" />
+  <link rel="stylesheet" href="css/pages.css" />
 
   <!-- Third-party Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -26,132 +23,106 @@
 </head>
 <body>
 
-  <!-- Sidebar Toggle (mobile) -->
-  <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle navigation">
-    <i data-lucide="menu"></i>
-  </button>
+  <div class="app-shell">
 
-  <!-- Sidebar Overlay (mobile) -->
-  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <!-- Sidebar Overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-  <!-- Sidebar -->
-  <aside id="sidebar" class="sidebar">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar" aria-label="Primary">
 
-    <!-- Brand -->
-    <div class="sidebar-brand">
-      <div class="brand-icon">
-        <i data-lucide="shield-check"></i>
+      <div class="sidebar-brand">
+        <div class="brand-mark">
+          <i data-lucide="shield-check"></i>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">WebGuard</span>
+          <span class="brand-subtitle">Security Platform</span>
+        </div>
+        <button class="sidebar-collapse" id="sidebar-collapse" type="button" aria-label="Collapse navigation" title="Collapse navigation"><i data-lucide="panel-left-close"></i></button>
       </div>
-      <div class="brand-text">
-        <span class="brand-name">WebGuard</span>
-        <span class="brand-subtitle">Security Platform</span>
+
+      <nav class="sidebar-nav" aria-label="Main navigation">
+        <ul class="nav-list">
+          <li class="nav-section-label">Security Operations</li>
+          <li><a href="#" class="nav-item" data-page="overview" data-section="Security Operations" title="Dashboard Overview"><i data-lucide="layout-dashboard"></i><span>Dashboard Overview</span></a></li>
+          <li><a href="#" class="nav-item" data-page="new-scan" data-section="Security Operations" title="New Security Scan"><i data-lucide="scan-search"></i><span>New Security Scan</span></a></li>
+          <li><a href="#" class="nav-item" data-page="scan-history" data-section="Security Operations" title="Scan History"><i data-lucide="history"></i><span>Scan History</span></a></li>
+
+          <li class="nav-section-label">Attack Surface</li>
+          <li><a href="#" class="nav-item" data-page="findings" data-section="Attack Surface" title="Security Findings"><i data-lucide="alert-triangle"></i><span>Security Findings</span></a></li>
+          <li><a href="#" class="nav-item" data-page="attack-surface" data-section="Attack Surface" title="Attack Surface"><i data-lucide="globe"></i><span>Attack Surface</span></a></li>
+          <li><a href="#" class="nav-item" data-page="vuln-intel" data-section="Attack Surface" title="Vulnerability Intelligence"><i data-lucide="shield-alert"></i><span>Vulnerability Intelligence</span></a></li>
+
+          <li class="nav-section-label">Assessments</li>
+          <li><a href="#" class="nav-item" data-page="privacy" data-section="Assessments" title="Privacy Assessment"><i data-lucide="eye-off"></i><span>Privacy Assessment</span></a></li>
+          <li><a href="#" class="nav-item" data-page="quality" data-section="Assessments" title="Website Quality"><i data-lucide="gauge"></i><span>Website Quality</span></a></li>
+          <li><a href="#" class="nav-item" data-page="compliance" data-section="Assessments" title="Compliance Assessment"><i data-lucide="clipboard-check"></i><span>Compliance Assessment</span></a></li>
+
+          <li class="nav-section-label">Administration</li>
+          <li><a href="#" class="nav-item" data-page="reports" data-section="Administration" title="Reports"><i data-lucide="file-text"></i><span>Reports</span></a></li>
+          <li><a href="#" class="nav-item" data-page="settings" data-section="Administration" title="Settings"><i data-lucide="settings"></i><span>Settings</span></a></li>
+          <li><a href="#" class="nav-item" data-page="about" data-section="Administration" title="About WebGuard"><i data-lucide="info"></i><span>About WebGuard</span></a></li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-status">
+          <span class="status-dot status-dot--online"></span>
+          <div class="sidebar-status-text">
+            <span class="status-text">Engine ready</span>
+            <span class="status-meta">v1.0.0 · Local mode</span>
+          </div>
+        </div>
       </div>
-      <button class="sidebar-collapse" id="sidebar-collapse" type="button" aria-label="Collapse navigation" title="Collapse navigation"><i data-lucide="panel-left-close"></i></button>
+
+    </aside>
+
+    <!-- Workspace -->
+    <div class="workspace">
+
+      <!-- Top bar -->
+      <header class="topbar" id="topbar">
+        <button class="icon-btn sidebar-toggle" id="sidebar-toggle" type="button" aria-label="Toggle navigation">
+          <i data-lucide="menu"></i>
+        </button>
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <span class="breadcrumb-root">WebGuard</span>
+          <i data-lucide="chevron-right"></i>
+          <span class="breadcrumb-section" id="crumb-section">Security Operations</span>
+          <i data-lucide="chevron-right"></i>
+          <span class="breadcrumb-current" id="crumb-page" aria-current="page">Dashboard Overview</span>
+        </nav>
+
+        <form class="topbar-scan" id="topbar-scan-form" role="search" aria-label="Quick scan">
+          <i data-lucide="globe"></i>
+          <input id="topbar-scan-input" type="url" placeholder="Quick scan: https://example.com" autocomplete="url" aria-label="URL to scan" required />
+          <button class="btn btn-primary btn-sm" type="submit"><i data-lucide="play"></i><span>Scan</span></button>
+        </form>
+
+        <div class="topbar-actions">
+          <div class="topbar-chip" id="topbar-last-scan" title="Most recent scan">
+            <i data-lucide="activity"></i>
+            <span>No scans yet</span>
+          </div>
+          <button class="icon-btn" id="theme-toggle" type="button" aria-label="Switch colour theme" title="Switch colour theme">
+            <i data-lucide="sun"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <main id="main-content" class="main-content" tabindex="-1">
+        <!-- Initial loading spinner shown until app.js takes over -->
+        <div class="loading-overlay" id="initial-loader">
+          <div class="spinner spinner--lg"></div>
+          <p class="mt-4 text-muted">Initialising WebGuard…</p>
+        </div>
+      </main>
+
     </div>
-
-    <!-- Navigation -->
-    <nav class="sidebar-nav" aria-label="Main navigation">
-      <ul class="nav-list">
-        <li class="nav-section-label">Security Operations</li>
-        <li>
-          <a href="#" class="nav-item" data-page="overview">
-            <i data-lucide="layout-dashboard"></i>
-            <span>Dashboard Overview</span>
-          </a>
-        </li>
-        <li>
-          <a href="#" class="nav-item" data-page="new-scan">
-            <i data-lucide="scan-search"></i>
-            <span>New Security Scan</span>
-          </a>
-        </li>
-        <li>
-          <a href="#" class="nav-item" data-page="scan-history">
-            <i data-lucide="history"></i>
-            <span>Scan History</span>
-          </a>
-        </li>
-
-        <li class="nav-section-label">Attack Surface</li>
-        <li>
-          <a href="#" class="nav-item" data-page="findings">
-            <i data-lucide="alert-triangle"></i>
-            <span>Security Findings</span>
-          </a>
-        </li>
-        <li>
-          <a href="#" class="nav-item" data-page="attack-surface">
-            <i data-lucide="globe"></i>
-            <span>Attack Surface</span>
-          </a>
-        </li>
-        <li>
-          <a href="#" class="nav-item" data-page="vuln-intel">
-            <i data-lucide="shield-alert"></i>
-            <span>Vulnerability Intelligence</span>
-          </a>
-        </li>
-
-        <li class="nav-section-label">Assessments</li>
-        <li>
-          <a href="#" class="nav-item" data-page="privacy">
-            <i data-lucide="eye-off"></i>
-            <span>Privacy Assessment</span>
-          </a>
-        </li>
-        <li>
-          <a href="#" class="nav-item" data-page="quality">
-            <i data-lucide="gauge"></i>
-            <span>Website Quality</span>
-          </a>
-        </li>
-        <li>
-          <a href="#" class="nav-item" data-page="compliance">
-            <i data-lucide="clipboard-check"></i>
-            <span>Compliance Assessment</span>
-          </a>
-        </li>
-
-        <li class="nav-section-label">Administration</li>
-        <li>
-          <a href="#" class="nav-item" data-page="reports">
-            <i data-lucide="file-text"></i>
-            <span>Reports</span>
-          </a>
-        </li>
-        <li>
-          <a href="#" class="nav-item" data-page="settings">
-            <i data-lucide="settings"></i>
-            <span>Settings</span>
-          </a>
-        </li>
-        <li>
-          <a href="#" class="nav-item" data-page="about">
-            <i data-lucide="info"></i>
-            <span>About WebGuard</span>
-          </a>
-        </li>
-      </ul>
-    </nav>
-
-    <!-- Sidebar Footer -->
-    <div class="sidebar-footer">
-      <div class="sidebar-status">
-        <span class="status-dot status-dot--online"></span>
-        <span class="status-text">v1.0.0 · Ready</span>
-      </div>
-    </div>
-
-  </aside>
-
-  <!-- Main Content -->
-  <main id="main-content" class="main-content">
-    <!-- Initial loading spinner shown until app.js takes over -->
-    <div class="loading-overlay" id="initial-loader">
-      <div class="spinner spinner--lg"></div>
-      <p class="mt-4 text-muted">Initialising WebGuard…</p>
-    </div>
-  </main>
+  </div>
 
   <!-- App Entry Point -->
   <script type="module" src="js/app.js"></script>

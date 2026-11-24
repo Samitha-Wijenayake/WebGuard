@@ -1,5 +1,6 @@
 import { getState } from '../state.js';
 import { getScan, saveReport } from '../storage.js';
+import { renderNoScan } from './_empty.js';
 
 async function loadScan() {
   const state = getState();
@@ -16,26 +17,46 @@ function escapeHtml(value) {
 export async function render(container) {
   const scan = await loadScan();
   if (!scan) {
-    container.innerHTML = `<div class="page-header"><h1 class="page-title"><i data-lucide="file-text"></i> Reports</h1></div><div class="card empty-state"><h3>No completed scan selected</h3><p>Run a scan, then open Reports to export it.</p></div>`;
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+    renderNoScan(container, { icon: 'file-text', title: 'Reports', subtitle: 'Export completed assessments', message: 'Run a scan, then open Reports to export it.' });
     return;
   }
 
   const findings = scan.findings || [];
+  const reportSummary = scan.summary || {};
   container.innerHTML = `
     <div class="page-header">
       <div>
         <h1 class="page-title"><i data-lucide="file-text"></i> Reports</h1>
-        <p class="page-subtitle">${escapeHtml(scan.url)} · score ${scan.score ?? 0}</p>
+        <p class="page-subtitle">Export the assessment of <strong>${escapeHtml(scan.url)}</strong></p>
       </div>
     </div>
-    <div class="card" style="max-width:760px">
-      <p class="mb-3">This report is built from the selected local scan. It includes the score, severity counts, and finding titles.</p>
-      <div class="form-actions">
-        <button class="btn btn-primary" id="report-pdf" type="button"><i data-lucide="download"></i> Download PDF</button>
-        <button class="btn btn-secondary" id="report-json" type="button"><i data-lucide="braces"></i> Download JSON</button>
-      </div>
-      <p id="report-status" class="text-muted mt-3" role="status"></p>
+    <div class="report-layout">
+      <section class="card">
+        <div class="card-header"><div><h3 class="card-title"><i data-lucide="download"></i> Export formats</h3><p class="card-subtitle">This report is built from the selected local scan. It includes the score, severity counts, and finding titles.</p></div></div>
+        <div class="report-option">
+          <span class="report-option-icon"><i data-lucide="file-text"></i></span>
+          <div><strong>PDF report</strong><p>Cover page, executive summary and up to 45 detailed findings with evidence and remediation.</p></div>
+          <button class="btn btn-primary" id="report-pdf" type="button"><i data-lucide="download"></i> Download PDF</button>
+        </div>
+        <div class="report-option">
+          <span class="report-option-icon"><i data-lucide="braces"></i></span>
+          <div><strong>JSON export</strong><p>The complete scan record, saved in this browser and downloaded for tooling or archiving.</p></div>
+          <button class="btn btn-secondary" id="report-json" type="button"><i data-lucide="braces"></i> Download JSON</button>
+        </div>
+        <p id="report-status" class="text-muted mt-3" role="status"></p>
+      </section>
+      <aside class="card">
+        <div class="card-header"><div><h3 class="card-title"><i data-lucide="clipboard-list"></i> Report contents</h3><p class="card-subtitle">${escapeHtml(new Date(scan.startTime || Date.now()).toLocaleString())}</p></div></div>
+        <div class="report-summary-list">
+          <div><span>Security score</span><strong>${scan.score ?? 0} / 100</strong></div>
+          <div><span>Coverage</span><strong>${reportSummary.coverage ?? 0}%</strong></div>
+          <div><span>Critical</span><strong class="text-critical">${reportSummary.critical || 0}</strong></div>
+          <div><span>High</span><strong class="text-high">${reportSummary.high || 0}</strong></div>
+          <div><span>Medium</span><strong>${reportSummary.medium || 0}</strong></div>
+          <div><span>Low</span><strong>${reportSummary.low || 0}</strong></div>
+          <div><span>Total findings</span><strong>${findings.length}</strong></div>
+        </div>
+      </aside>
     </div>`;
   if (typeof lucide !== 'undefined') lucide.createIcons();
 

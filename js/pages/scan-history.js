@@ -64,7 +64,7 @@ export async function render(container) {
     if (!tableWrap) return;
     if (filtered.length === 0) {
       tableWrap.innerHTML = `
-        <div class="empty-state">
+        <div class="card empty-state">
           <i data-lucide="history"></i>
           <h3>No scans found</h3>
           <p>${scans.length === 0 ? 'Run your first scan to see results here.' : 'No scans match your current filters.'}</p>
@@ -80,7 +80,7 @@ export async function render(container) {
     }
 
     tableWrap.innerHTML = `
-      <div class="table-wrap">
+      <div class="card history-table-card"><div class="table-wrap">
         <table class="table">
           <thead>
             <tr>
@@ -102,7 +102,7 @@ export async function render(container) {
               const critical = scan.summary?.critical || 0;
               return `<tr>
                 <td>${new Date(scan.startTime).toLocaleString()}</td>
-                <td class="truncate" style="max-width:200px" title="${escHtml(scan.url)}">${escHtml(scan.url)}</td>
+                <td class="truncate scan-url-cell" title="${escHtml(scan.url)}">${escHtml(scan.url)}</td>
                 <td><strong>${scan.score || 0}</strong></td>
                 <td><span class="badge ${cls}">${grade}</span></td>
                 <td class="${critical > 0 ? 'text-critical' : ''}">${critical}</td>
@@ -127,7 +127,7 @@ export async function render(container) {
             }).join('')}
           </tbody>
         </table>
-      </div>`;
+      </div></div>`;
 
     if (typeof lucide !== 'undefined') lucide.createIcons();
 
@@ -186,7 +186,7 @@ export async function render(container) {
         <p class="page-subtitle">Review and manage your previous security assessments</p>
       </div>
       <div class="page-header-actions">
-        <span id="sh-count" class="text-muted"></span>
+        <span id="sh-count" class="badge badge-info"></span>
         <button id="sh-clear-all" class="btn btn-danger btn-sm">
           <i data-lucide="trash-2"></i> Clear All
         </button>
@@ -197,23 +197,23 @@ export async function render(container) {
     <div class="card filter-bar mb-3">
       <div class="filter-row">
         <div class="filter-group">
-          <label class="label">Search</label>
+          <label class="label" for="sh-search">Search</label>
           <input id="sh-search" class="input" type="search" placeholder="Filter by URL..." />
         </div>
         <div class="filter-group">
-          <label class="label">From</label>
+          <label class="label" for="sh-date-from">From</label>
           <input id="sh-date-from" class="input" type="date" />
         </div>
         <div class="filter-group">
-          <label class="label">To</label>
+          <label class="label" for="sh-date-to">To</label>
           <input id="sh-date-to" class="input" type="date" />
         </div>
         <div class="filter-group">
-          <label class="label">Min Score</label>
-          <input id="sh-score-min" class="input" type="number" min="0" max="100" value="0" style="width:80px" />
+          <label class="label" for="sh-score-min">Min Score</label>
+          <input id="sh-score-min" class="input" type="number" min="0" max="100" value="0" />
         </div>
         <div class="filter-group">
-          <label class="label">Sort</label>
+          <label class="label" for="sh-sort">Sort</label>
           <select id="sh-sort" class="select">
             <option value="date-desc">Newest First</option>
             <option value="date-asc">Oldest First</option>

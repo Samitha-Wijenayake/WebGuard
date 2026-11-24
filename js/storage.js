@@ -11,7 +11,8 @@ const SETTINGS_KEY = 'webguard_settings';
 // ─── Default Settings ─────────────────────────────────────────
 const DEFAULT_SETTINGS = {
   theme: 'dark',
-  crawlLimit: 250,
+  crawlLimit: 100,
+  settingsVersion: 2,
   timeout: 10000,
   concurrency: 3,
   retentionDays: 90,
@@ -268,6 +269,12 @@ export function loadSettings() {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
     const parsed = JSON.parse(raw);
+    // v2: the default crawl limit moved from 250 to 100 pages. Settings saved before
+    // that still carry the old default, so migrate it unless the user changed it.
+    if (!parsed.settingsVersion) {
+      if (Number(parsed.crawlLimit) === 250) parsed.crawlLimit = DEFAULT_SETTINGS.crawlLimit;
+      parsed.settingsVersion = DEFAULT_SETTINGS.settingsVersion;
+    }
     return { ...DEFAULT_SETTINGS, ...parsed };
   } catch {
     return { ...DEFAULT_SETTINGS };
