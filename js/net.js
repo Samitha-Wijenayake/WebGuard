@@ -1,6 +1,8 @@
 /**
- * Talks to the local WebGuard server, which fetches targets outside the browser CORS sandbox.
+ * Talks to the WebGuard server (local or deployed on Render), which fetches targets
+ * outside the browser CORS sandbox.
  */
+import { API_BASE } from './config.js';
 
 export async function proxyFetch(url, options = {}) {
   const params = new URLSearchParams({
@@ -12,10 +14,12 @@ export async function proxyFetch(url, options = {}) {
 
   let response;
   try {
-    response = await fetch(`/api/fetch?${params}`, { signal: options.signal });
+    response = await fetch(`${API_BASE}/api/fetch?${params}`, { signal: options.signal });
   } catch (error) {
     if (error.name === 'AbortError') throw new Error('Scan cancelled');
-    throw new Error('Cannot reach the WebGuard scanner service. Start it with: node server.js');
+    throw new Error(API_BASE
+      ? `Cannot reach the WebGuard scanner service at ${API_BASE}. It may be starting up — try again in a moment.`
+      : 'Cannot reach the WebGuard scanner service. Start it with: node server.js');
   }
 
   const data = await response.json().catch(() => null);

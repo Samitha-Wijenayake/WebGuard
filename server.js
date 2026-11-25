@@ -1,7 +1,9 @@
 /**
  * Local WebGuard server.
  * Serves the app and fetches public http(s) targets so the browser can read headers and HTML.
- * Binds to loopback only and refuses private, link-local, and metadata addresses.
+ * Binds to 0.0.0.0 by default (override with HOST) so hosts like Render can route to it,
+ * and refuses private, link-local, and metadata targets.
+ * Cross-origin callers (e.g. the Vercel frontend) must be listed in ALLOWED_ORIGINS.
  */
 const http = require('http');
 const https = require('https');
@@ -12,7 +14,41 @@ const net = require('net');
 const { URL } = require('url');
 
 const PORT = Number(process.env.PORT) || 4173;
-const HOST = '127.0.0.1';
+const HOST = process.env.HOST || '0.0.0.0';
+
+// Comma-separated list of origins allowed to call the API, e.g.
+//   ALLOWED_ORIGINS=https://webguard-ecru.vercel.app,https://*.vercel.app
+// A leading "*." in the hostname matches any subdomain (useful for Vercel preview deployments).
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS
+  || 'https://webguard-ecru.vercel.app,http://localhost:4173,http://127.0.0.1:4173')
+  .split(',')
+  .map(origin => origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  return ALLOWED_ORIGINS.some((allowed) => {
+    if (allowed === origin) return true;
+    const wildcard = allowed.match(/^(https?):\/\/\*\.(.+)$/);
+    if (!wildcard) return false;
+    try {
+      const parsed = new URL(origin);
+      return parsed.protocol === `${wildcard[1]}:` && parsed.hostname.endsWith(`.${wildcard[2]}`);
+    } catch {
+      return false;
+    }
+  });
+}
+
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  res.setHeader('Vary', 'Origin');
+  if (!isAllowedOrigin(origin)) return;
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Max-Age', '600');
+}
 const ROOT = __dirname;
 const MAX_REDIRECTS = 5;
 
@@ -156,7 +192,7 @@ async function fetchTarget(rawUrl, method, timeout, maxBytes) {
 }
 
 function serveStatic(req, res) {
-  const url = new URL(req.url, `http://${HOST}`);
+  const url = new URL(req.url, 'http://localhost');
   let pathname = decodeURIComponent(url.pathname);
   if (pathname.endsWith('/')) pathname += 'index.html';
   const filePath = path.normalize(path.join(ROOT, pathname));
@@ -186,7 +222,13 @@ function serveStatic(req, res) {
 
 const server = http.createServer(async (req, res) => {
   try {
-    const url = new URL(req.url, `http://${HOST}:${PORT}`);
+    applyCors(req, res);
+    if (req.method === 'OPTIONS') {
+      res.writeHead(isAllowedOrigin(req.headers.origin) ? 204 : 403);
+      res.end();
+      return;
+    }
+    const url = new URL(req.url, `http://localhost:${PORT}`);
     if (url.pathname === '/api/fetch') {
       const target = url.searchParams.get('url') || '';
       const method = (url.searchParams.get('method') || 'GET').toUpperCase();
@@ -213,5 +255,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`WebGuard running at http://${HOST}:${PORT}`);
+  console.log(`WebGuard listening on http://${HOST}:${PORT}`);
+  console.log(`CORS allowed origins: ${ALLOWED_ORIGINS.join(', ')}`);
 });
