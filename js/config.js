@@ -11,4 +11,7 @@ export const RENDER_API_URL = 'https://webguard-8hnb.onrender.com';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
-export const API_BASE = LOCAL_HOSTS.has(window.location.hostname) ? '' : RENDER_API_URL;
+// Same origin when served by server.js itself (locally or on Render); otherwise the Render API.
+const servedByApi = LOCAL_HOSTS.has(window.location.hostname) || window.location.origin === RENDER_API_URL;
+
+export const API_BASE = servedByApi ? '' : RENDER_API_URL;
