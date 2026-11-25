@@ -7,7 +7,7 @@
  *
  * Set RENDER_API_URL to your Render service URL (no trailing slash).
  */
-export const RENDER_API_URL = 'https://webguard-api.onrender.com';
+export const RENDER_API_URL = 'https://webguard-8hnb.onrender.com';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
